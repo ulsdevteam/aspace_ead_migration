@@ -12,29 +12,32 @@ source:
   plugin: aspace_file_source
   object_type: resources
   constants:
+    TITLE_SUFFIX: ' (EAD)'
     aspace_ead_dir: 'private://findingaid'
 process:
-  status:
-    plugin: default_value
-    default_value: 1
-
   field_media_file/target_id:
     plugin: get_xml_file
-    source: 
+    source:
       - file_uri
       - file_name
       - file_mime
       - repo_id
       - xml_path
+      - save_dir
   name:
     plugin: concat
     source:
-      - xml_title
-      - file_name
+      - file_uri
+      - constants/TITLE_SUFFIX
+  status:
+    plugin: default_value
+    default_value: 1
   field_media_file/display:
     plugin: default_value
     default_value: 1
 destination:
   plugin: 'entity:media'
   default_bundle: findingaid
+idMap: {  }
 migration_dependencies: null
+include: null

@@ -192,7 +192,7 @@ class ASpaceFileSource extends SourcePluginBase {
             //Store file data for the media entity's file field.
             $item_ead['xml_path'] = $xml_path;
             //print_r($item_ead);
-
+           
             $count_per_repo++;
             //All accumulated eads
             array_push($all_eads, $item_ead); 
