@@ -1,0 +1,7 @@
+aspace_ead_migration.settings:
+  path: '/admin/config/aspace_ead_migration'
+  defaults:
+    _form: '\Drupal\aspace_ead_migration\Form\ASpaceConfigForm'
+    _title: 'ASpace EAD Migration Settings'
+  requirements:
+    _permission: 'administer site configuration'

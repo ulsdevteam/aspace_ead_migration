@@ -1,0 +1,7 @@
+aspace_ead_migration.settings:
+  title: 'ASpace EAD migration configurations'
+  description: 'Configure ArchivesSpace API endpoint and repository IDs for media migration.'
+  parent: system.admin_config
+  route_name: aspace_ead_migration.settings
+  weight: 10
+
