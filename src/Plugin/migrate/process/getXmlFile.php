@@ -3,18 +3,16 @@
 namespace Drupal\aspace_ead_migration\Plugin\migrate\process;
 
 use Drupal\aspace_ead_migration\ArchivesSpaceSession;
+use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\File\FileExists;
-use Drupal\Core\File\FileSystemInterface;
-use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\file\FileInterface;
 use Drupal\file\FileRepositoryInterface;
 use Drupal\migrate\MigrateException;
 use Drupal\migrate\MigrateExecutableInterface;
 use Drupal\migrate\ProcessPluginBase;
 use Drupal\migrate\Row;
-use GuzzleHttp\ClientInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 
@@ -28,16 +26,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 class GetXmlFile extends ProcessPluginBase implements ContainerFactoryPluginInterface 
 {
   protected ArchivesSpaceSession $session;
-
-  /**
-   * Drupal file system service
-   */
-  protected FileSystemInterface $fileSystem;
-
+  protected string $apiBaseUrl;
+  protected string $username;
+  protected string $password;
   /**
    * File repository service.
-   *
-   * @var \Drupal\file\FileRepositoryInterface
    */
   protected FileRepositoryInterface $fileRepository;
 
@@ -47,6 +40,7 @@ class GetXmlFile extends ProcessPluginBase implements ContainerFactoryPluginInte
    * @var \Drupal\Core\Entity\EntityTypeManagerInterface
    */
   protected EntityTypeManagerInterface $entityTypeManager;
+
   const SAVE_BASE_URI = 'private://findingaid';
   const EAD_PARAMETERS = [
       		'include_unpublished' => "False",
@@ -58,24 +52,29 @@ class GetXmlFile extends ProcessPluginBase implements ContainerFactoryPluginInte
   /**
    * Constructs a GetXmlFile process plugin.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, ConfigFactoryInterface $configFactory) {
-
+  public function __construct(
+    array $configuration, 
+    $plugin_id, 
+    $plugin_definition, 
+    ConfigFactoryInterface $configFactory,
+    FileRepositoryInterface $file_repository) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
+    
     $configs = $configFactory->get('aspace_ead_migration.settings');
-     
     if (! empty($configs->get('archivesspace_base_uri'))) {
       $this->apiBaseUrl = rtrim($configs->get('archivesspace_base_uri'), '/');
     }
-    
     $this->username = $configs->get('archivesspace_username');
     $this->password = $configs->get('archivesspace_password');
     $this->session = ArchivesSpaceSession::withConnectionInfo(
           $this->apiBaseUrl, $this->username, $this->password
         );
+    $this->fileRepository  = $file_repository;
   }
 
    /**
    * {@inheritdoc}
+   * Get services from container and pass to construct.
    */
   public static function create(
     ContainerInterface $container,
@@ -87,14 +86,14 @@ class GetXmlFile extends ProcessPluginBase implements ContainerFactoryPluginInte
       $configuration,
       $plugin_id,
       $plugin_definition,
-      $container->get('config.factory')
+      $container->get('config.factory'),
+      $container->get('file.repository')
     );
   }
 
   // ---------------------------------------------------------------------------
   // ProcessPluginBase
   // ---------------------------------------------------------------------------
-
   /**
    * {@inheritdoc}
    * Called once per row by drupal migration process
@@ -124,7 +123,7 @@ class GetXmlFile extends ProcessPluginBase implements ContainerFactoryPluginInte
       // download the XML content via the authenticated session 
       $ead_xml = $this->session->request('GET', $xml_path, self::EAD_PARAMETERS, FALSE, TRUE);
       $destination_uri = rtrim($save_dir, '/') . '/' . $file_name;
-      $file = \Drupal::service('file.repository')->writeData(
+      $file = $this->fileRepository->writeData(
                 $ead_xml,
                 $destination_uri,
                 FileExists::Replace
@@ -136,9 +135,7 @@ class GetXmlFile extends ProcessPluginBase implements ContainerFactoryPluginInte
               'Skipping @url: @msg',
               ['@url' => $xml_path, '@msg' => $e->getMessage()],
               );
-    }
-   
+    } 
   }
-
 }
 
