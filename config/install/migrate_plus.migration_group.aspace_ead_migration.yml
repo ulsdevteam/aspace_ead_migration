@@ -1,5 +1,5 @@
 id: aspace_ead_migration
 label: 'ASpace EAD Migration'
-description: 'Migrations EAD files from ArchivesSpace API into Drupal managed media entities.'
+description: 'A module to migrate EAD files from ArchivesSpace API into Drupal managed media entities.'
 source_type: 'External ASpace API'
 shared_configuration: null

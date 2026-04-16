@@ -103,7 +103,7 @@ class GetXmlFile extends ProcessPluginBase implements ContainerFactoryPluginInte
     MigrateExecutableInterface $migrate_executable,
     Row $row,
     $destination,
-  ): int {
+  ): array {
     // Read all required values from the source row.
    [
       $file_uri,
@@ -128,7 +128,10 @@ class GetXmlFile extends ProcessPluginBase implements ContainerFactoryPluginInte
                 $destination_uri,
                 FileExists::Replace
               );
-       return (int) $file->id();
+       return [
+        'fid'  => (int) $file->id(),
+        'f_uri' => $file_uri,
+       ];
     }
     catch (MigrateException $e) {
              \Drupal::logger('aspace_ead_migration')->error(

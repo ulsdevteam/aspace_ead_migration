@@ -8,6 +8,7 @@ use Drupal\Core\File\FileSystemInterface;
 use Drupal\migrate\MigrateException;
 use Drupal\migrate\Plugin\migrate\source\SourcePluginBase;
 use Drupal\migrate\Plugin\MigrationInterface;
+use Drupal\field\Entity\FieldConfig;
 
 /**
  * Source plugin: fetches XML files from ASpace API per repository.
@@ -36,8 +37,10 @@ class ASpaceFileSource extends SourcePluginBase {
   public function __construct(array $configuration, $plugin_id, $plugin_definition, MigrationInterface $migration) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $migration);
 
-    if (isset($configuration['constants']['aspace_ead_dir'])) {
-      $this->eadXmlDir = $configuration['constants']['aspace_ead_dir'] ?? self::SAVE_BASE_URI;
+    if (isset($configuration['constants']['bundle_type'])) {
+      $this->eadXmlDir = $this->getMediaFileDir($configuration['constants']['bundle_type']); 
+    } else {
+      $this->eadXmlDir = self::SAVE_BASE_URI;
     }
     $configs = \Drupal::service('config.factory')->get('aspace_ead_migration.settings');
     if (! empty($configs->get('archivesspace_base_uri') )) {
@@ -92,6 +95,7 @@ class ASpaceFileSource extends SourcePluginBase {
             'repo_id'        => $repo_id,
             'xml_path'       => $item['xml_path'],
             'save_dir'       => $eadXmlDir,
+            'system_modified' => $item['system_modified'],
           ];
         }
       }
@@ -104,6 +108,10 @@ class ASpaceFileSource extends SourcePluginBase {
     }
     \Drupal::logger('aspace_ead_migration')->info(
       'ASpace Source built @count migration rows.',['@count' => count($rows)],);
+    
+    $modified = array_column($rows, 'system_modified');
+    // Sort $rows ascending by $updated values
+    array_multisort($modified, SORT_ASC, SORT_NUMERIC, $rows);
     return new \ArrayIterator($rows);
   }
 
@@ -127,6 +135,7 @@ class ASpaceFileSource extends SourcePluginBase {
       'repo_id'       => $this->t('Source repository ID'),
       'xml_path'      => $this->t('Source EAD file path'), //apiPath to fetch EAD e.g./repositories/16/resource_descriptions/1129.xml
       'save_dir'      => $this->t('EAD directory the process plugin should save into'),
+      'system_modified' => $this->t('resource last updated timestamp'),
     ];
   }
 
@@ -137,6 +146,26 @@ class ASpaceFileSource extends SourcePluginBase {
     return 'ASpace EAD XML Source';
   }
 
+  /**
+  * Retrieve Media File directory from File field 
+  */
+  protected function getMediaFileDir(string $bundletype) {
+    //Load the fieldConfig Object
+    $field_instance = FieldConfig::load('media.findingaid.field_media_file');
+    if ($field_instance) {
+       //Get the URI scheme (e.g., 'public', 'private').
+      $file_storage = \Drupal::service('config.factory')->get('field.storage.media.field_media_file');
+      $uploadDestination = $file_storage->get('settings.uri_scheme') ?? 'public';
+       
+      $fileDirectory = $field_instance->getSetting('file_directory') ?? 'findingaid';
+      $fileDirectory = trim($fileDirectory, '/');
+
+      return $uploadDestination . '://' . $fileDirectory;
+    } else {
+      \Drupal::logger('apace_ead_migration')->warning('Field Media File not configured.');
+      return self::SAVE_BASE_URI;
+    }
+  }
   /**
    * Retrieve EAD files from API per ASpace repository
    * @param int    $repo_id: repository ID
@@ -175,6 +204,9 @@ class ASpaceFileSource extends SourcePluginBase {
          if (($item['publish']) and ($item['is_finding_aid_status_published'])) {
           // Retrieve URI for later Media title usage
           $item_ead['file_uri'] = $item['uri'];
+
+          //Get resource last updated timestamp
+          $item_ead['system_modified'] = strtotime($item['system_mtime']);
          
           // Build EAD xmlpath to fetch from ASpace api
           $resourceId =  substr(strrchr($item['uri'], "/"), 1);
