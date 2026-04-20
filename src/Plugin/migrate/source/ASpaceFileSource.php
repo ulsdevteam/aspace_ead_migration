@@ -110,7 +110,7 @@ class ASpaceFileSource extends SourcePluginBase {
       'ASpace Source built @count migration rows.',['@count' => count($rows)],);
     
     $modified = array_column($rows, 'system_modified');
-    // Sort $rows ascending by $updated values
+    // Sort all $rows with high water field before process
     array_multisort($modified, SORT_ASC, SORT_NUMERIC, $rows);
     return new \ArrayIterator($rows);
   }
@@ -180,10 +180,12 @@ class ASpaceFileSource extends SourcePluginBase {
       $parameters = [
         'page' => $current_page,
         'page_size' => $this->pageSize,
+        'type[]' =>'resource',
+        'sort' => 'system_mtime asc'   
       ];
       
-      // Fetch resources in the repository
-       $response = $this->session->request('GET', '/repositories/'. $repo_id . '/resources', $parameters);
+      // Fetch resources in order from the repository via searchAPI
+      $response = $this->session->request('GET', '/repositories/'. $repo_id . '/search', $parameters);
       if (empty($response)) {
         \Drupal::logger('aspace_ead_migration')->warning('No EAD returned for repository @id.',
           ['@id' => $repo_id],
@@ -195,13 +197,18 @@ class ASpaceFileSource extends SourcePluginBase {
       'first_page' => (int) ($response['first_page'] ?? 1),
       'last_page'  => (int) ($response['last_page']),
       'this_page'  => (int) ($response['this_page']),
-      'total'      => (int) ($response['total']),
+      'total'      => (int) ($response['total_hits']),
       ];
 
       // Iterate all resources in repository per page
       foreach ($response['results'] as $item) {
          $item_ead = [];
-         if (($item['publish']) and ($item['is_finding_aid_status_published'])) {
+
+        if ($item['publish']) {
+         //parse json in response
+         $data = json_decode($item['json'], true);
+         if (isset($data['is_finding_aid_status_published']) && $data['is_finding_aid_status_published'])
+         {
           // Retrieve URI for later Media title usage
           $item_ead['file_uri'] = $item['uri'];
 
@@ -226,7 +233,8 @@ class ASpaceFileSource extends SourcePluginBase {
               ['@url' => $xml_path, '@id' => $repo_id, '@msg' => $e->getMessage()],
               );
             }
-        }
+         }
+      }
      } //end resource interation
 
      \Drupal::logger('aspace_ead_migration')->info(
