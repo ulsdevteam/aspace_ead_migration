@@ -30,7 +30,7 @@ class ASpaceConfigForm extends ConfigFormBase {
    */
   public function buildForm(array $form, FormStateInterface $form_state): array {
 
-    $config = $this->config('api_media_migration.settings');
+    $config = $this->config('aspace_ead_migration.settings');
     $form['connection'] = [
       '#type' => 'details',
       '#title' => $this->t('ArchivesSpace API Connection Settings'),
@@ -55,7 +55,10 @@ class ASpaceConfigForm extends ConfigFormBase {
       '#type' => 'password',
       '#title' => $this->t('Password'),
       '#config_target' => 'aspace_ead_migration.settings:archivesspace_password',
-      '#description'   => $this->t('Leave blank to leave unchanged.'),
+      '#description'   => $this->t('Leave blank if no password stored.'),
+      '#attributes'    => $config->get('archivesspace_password')
+                          ? ['placeholder' => $this->t('(password has already stored)')]
+                          : [],
     ];
     
     // Stored as an array of integers; display as a comma-separated string.
