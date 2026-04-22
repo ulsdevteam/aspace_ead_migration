@@ -16,11 +16,11 @@ This module is designed to migrate ArchivesSpace EAD into drupal Media entities 
     * Name: Finding Aid
     * Media source: File
 - Add required fields under 'Manage fields' with the following configurations:
-   - field_media_file 
+   - File (machine_name: field_media_file)
      * Field Storage: Select 'Private files' under 'Upload destination' Option
      * Allowed file extensions: xml
      * File directory: findingaid
-   - field_media_of - Entity reference field
+   - Media of (machine_name:field_media_of) - Entity reference field
 - The migration YAML file must define the **high water property** pointing to
   `system_mtime` in the Source Plugin configuration
 
@@ -35,7 +35,7 @@ This module is designed to migrate ArchivesSpace EAD into drupal Media entities 
    ASpace ead migration uses ArchivesSpace API endpoint, which must be configured with your ArchivesSpace URL, username, and password. Please visit  `/admin/configuration/ASpace EAD migration configuration settings` in your Drupal site to configure these settings before migration.
 
 ## Migration 
-1. Use drush to execute migration: `drush mim aspace_ead_migration`
+   -  Use drush to execute migration: `drush mim aspace_ead_migration_media`
 
 ## Migration dataflow
    -  ![ArchivesSpace EAD Migration dataflow](dataflow/aspace_ead_migration_media.png)

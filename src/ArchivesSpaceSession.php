@@ -14,7 +14,7 @@ class ArchivesSpaceSession {
    * @var array
    */
   protected $connectionInfo = [
-    'base_uri' => 'https://pittapi.as.atlas-sys.com',
+    'base_uri' => 'https://test.com',
     'username' => 'admin',
     'password' => 'admin',
   ];
@@ -101,7 +101,7 @@ class ArchivesSpaceSession {
     $request_data = [
       'headers' => [
         'X-ArchivesSpace-Session' => $this->session,
-        'content-type' => 'application/xml',
+        'content-type' => 'application/x-www-form-urlencoded',
       ],
     ];
 
