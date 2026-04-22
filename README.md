@@ -35,7 +35,7 @@ This module is designed to migrate ArchivesSpace EAD into drupal Media entities 
    ASpace ead migration uses ArchivesSpace API endpoint, which must be configured with your ArchivesSpace URL, username, and password. Please visit  `/admin/configuration/ASpace EAD migration configuration settings` in your Drupal site to configure these settings before migration.
 
 ## Migration 
-1. Use drush to execute migration: `drush mim aspace_ead_migration_media -vv`
+1. Use drush to execute migration: `drush mim aspace_ead_migration`
 
 ## Migration dataflow
    -  ![ArchivesSpace EAD Migration dataflow](dataflow/aspace_ead_migration_media.png)
