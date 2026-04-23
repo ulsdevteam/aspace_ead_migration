@@ -1,0 +1,10 @@
+name: ASpace EAD Migration
+type: module
+description: 'Migrate EAD files from ArchivesSpace data source into drupal media entities'
+core_version_requirement: ^10 || ^11
+package: Custom
+dependencies:
+  - drupal:migrate
+  - drupal:migrate_plus
+  - drupal:media
+  - drupal:file

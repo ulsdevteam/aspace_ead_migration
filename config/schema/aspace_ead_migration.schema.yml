@@ -1,0 +1,22 @@
+aspace_ead_migration.settings:
+  type: config_object
+  label: 'ArchivesSpace EAD Migration settings'
+  mapping:
+    archivesspace_base_uri:
+      type: string
+      label: 'ArchivesSpace API Endpoint'
+      constraints:
+        NotBlank:
+          message: "Please set ArchivesSpace API uri."
+    archivesspace_username:
+      type: string
+      label: 'ArchivesSpace API Username'
+    archivesspace_password:
+      type: string
+      label: 'ArchivesSpace API Password'
+    archivesspace_repository_ids:
+      type: sequence
+      label: 'ArchivesSpace repository ids'
+      sequence:
+        type: integer
+        label: 'ArchivesSpace repository id'

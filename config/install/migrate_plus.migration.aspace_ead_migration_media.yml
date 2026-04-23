@@ -1,0 +1,55 @@
+langcode: en
+status: true
+dependencies: {  }
+id: aspace_ead_migration_media
+migration_group: aspace_ead_migration
+label: 'Migration ArchivesSpace EAD to Media entities'
+source:
+  plugin: aspace_file_source
+  object_type: resources
+  constants:
+    TITLE_SUFFIX: ' (EAD)'
+    bundle_type: findingaid
+  high_water_property:
+    name: system_modified
+    alias: sm
+process:
+  temp_file_array:
+    plugin: get_xml_file
+    source:
+      - file_uri
+      - file_name
+      - file_mime
+      - repo_id
+      - xml_path
+      - save_dir
+  file_path:
+    plugin: extract
+    source: '@temp_file_array'
+    index:
+      - f_uri
+  name:
+    plugin: concat
+    source:
+      - '@file_path'
+      - constants/TITLE_SUFFIX
+  field_media_file/target_id:
+    plugin: extract
+    source: '@temp_file_array'
+    index:
+      - fid
+  status:
+    plugin: default_value
+    default_value: 1
+  field_media_file/display:
+    plugin: default_value
+    default_value: 1
+  bundle:
+    -
+      plugin: get
+      source: constants/bundle_type
+    -
+      plugin: default_value
+      default_value: findingaid
+destination:
+  plugin: 'entity:media'

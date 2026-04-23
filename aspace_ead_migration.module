@@ -1,0 +1,19 @@
+<?php
+
+/**
+ * @file
+ * Contains aspace_ead_migration.module.
+ */
+
+use Drupal\Core\Routing\RouteMatchInterface;
+
+/**
+ * Implements hook_help().
+ * Provides help text for ASpace EAD migration
+ */
+function aspace_ead_migration_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.aspace_ead_migration':
+      return t('Provide ArchivesSpace EAD migration into Drupal entities') ;
+  }
+}
