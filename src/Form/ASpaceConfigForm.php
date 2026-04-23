@@ -55,7 +55,7 @@ class ASpaceConfigForm extends ConfigFormBase {
       '#type' => 'password',
       '#title' => $this->t('Password'),
       '#config_target' => 'aspace_ead_migration.settings:archivesspace_password',
-      '#description'   => $this->t('Leave blank if no password stored.'),
+      '#description'   => $this->t('Leave blank if not updating the password.'),
       '#attributes'    => $config->get('archivesspace_password')
                           ? ['placeholder' => $this->t('(password has already stored)')]
                           : [],

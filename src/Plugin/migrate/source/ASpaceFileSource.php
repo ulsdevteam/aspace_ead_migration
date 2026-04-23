@@ -74,13 +74,14 @@ class ASpaceFileSource extends SourcePluginBase {
 
     // Prepare ead directory                                                                                               
     $this->fileSystem->prepareDirectory($eadXmlDir, FileSystemInterface::CREATE_DIRECTORY); 
-
+  
     // Accumulate all rows from all repositories
     $rows = [];
     foreach ($repoIds as $repo_id) {
       try {
-        // Fetch all paginated resource per repository
-        $xml_results = $this->fetchEAD($repo_id);
+        // Fetch all paginated resource per repository filter by last importing
+        $last_import = $this->getHighWater() ?? 0;
+        $xml_results = $this->fetchEAD($repo_id, $last_import);
         if (empty($xml_results)) {
           \Drupal::logger('aspace_ead_migration')->info('No EAD returned for repository @id.', ['@id' => $repo_id],); 
           continue;
@@ -110,7 +111,7 @@ class ASpaceFileSource extends SourcePluginBase {
       'ASpace Source built @count migration rows.',['@count' => count($rows)],);
     
     $modified = array_column($rows, 'system_modified');
-    // Sort all $rows with high water field before process
+    //Sort all $rows with high water field before process
     array_multisort($modified, SORT_ASC, SORT_NUMERIC, $rows);
     return new \ArrayIterator($rows);
   }
@@ -155,7 +156,7 @@ class ASpaceFileSource extends SourcePluginBase {
     if ($field_instance) {
        //Get the URI scheme (e.g., 'public', 'private').
       $file_storage = \Drupal::service('config.factory')->get('field.storage.media.field_media_file');
-      $uploadDestination = $file_storage->get('settings.uri_scheme') ?? 'public';
+      $uploadDestination = $file_storage->get('settings.uri_scheme') ?? 'private';
        
       $fileDirectory = $field_instance->getSetting('file_directory') ?? 'findingaid';
       $fileDirectory = trim($fileDirectory, '/');
@@ -171,18 +172,38 @@ class ASpaceFileSource extends SourcePluginBase {
    * @param int    $repo_id: repository ID
    * @return int   Total number of files reported by the API.
    */
-   protected function fetchEAD(int $repo_id): array {
+   protected function fetchEAD(int $repo_id, int $last_import): array {
     $count_per_repo = 0;
     $current_page = 1;
-    $all_eads=[];
+    $all_eads = [];
+    $assoc_aq = [];
+    //convert $last_import timestamp to UTC for advance query
+    if ($last_import !==0 ) {
+      $last_import_date = gmdate('Y-m-d\TH:i:s\Z', $last_import);
+      $assoc_aq = [
+        "jsonmodel_type" => "advanced_query",
+        "query" => [
+          "jsonmodel_type" => "date_field_query",
+          "negated" => false,
+          "comparator" => "greater_than",
+          "field" => "system_mtime",
+          "value" => $last_import_date,
+          "precision" => "day"
+        ],
+      ];
+    }
 
     do {
       $parameters = [
-        'page' => $current_page,
-        'page_size' => $this->pageSize,
-        'type[]' =>'resource',
-        'sort' => 'system_mtime asc'   
-      ];
+          'page' => $current_page,
+          'page_size' => $this->pageSize,
+          'type[]' =>'resource',
+          'sort' => 'system_mtime asc'
+        ];
+
+      if ($assoc_aq) {
+        $parameters ["aq"]= json_encode($assoc_aq);
+        }
       
       // Fetch resources in order from the repository via searchAPI
       $response = $this->session->request('GET', '/repositories/'. $repo_id . '/search', $parameters);

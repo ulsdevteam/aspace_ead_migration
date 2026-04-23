@@ -40,13 +40,11 @@ class GetXmlFile extends ProcessPluginBase implements ContainerFactoryPluginInte
    * @var \Drupal\Core\Entity\EntityTypeManagerInterface
    */
   protected EntityTypeManagerInterface $entityTypeManager;
-
-  const SAVE_BASE_URI = 'private://findingaid';
   const EAD_PARAMETERS = [
-      		'include_unpublished' => "False",
-      		'include_daos' => "True",
-          'include_uris' => "True",
-          'ead3'=> "False",
+    'include_unpublished' => "False",
+    'include_daos' => "True",
+    'include_uris' => "True",
+    'ead3'=> "False",
     ];
 
   /**
