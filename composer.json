@@ -1,0 +1,9 @@
+{
+  "name": "drupal/aspace_ead_migration",
+  "type": "drupal-module-custom",
+  "description": "A custom module to migrate ArchivesSpace Finding Aid resources onto drupal media entities.",
+  "keywords": ["Drupal"],
+  "license": "GPL-2.0-or-later",
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}
