@@ -53,3 +53,9 @@ process:
       default_value: findingaid
 destination:
   plugin: 'entity:media'
+  overwrite_properties:
+    - name
+    - status
+    - field_media_file
+idMap:
+  plugin: sql

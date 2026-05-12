@@ -179,7 +179,7 @@ class ASpaceFileSource extends SourcePluginBase {
     $assoc_aq = [];
     //convert $last_import timestamp to UTC for advance query
     if ($last_import !==0 ) {
-      $last_import_date = gmdate('Y-m-d\TH:i:s\Z', $last_import);
+      $last_import_date = date('Y-m-d', $last_import);
       $assoc_aq = [
         "jsonmodel_type" => "advanced_query",
         "query" => [
