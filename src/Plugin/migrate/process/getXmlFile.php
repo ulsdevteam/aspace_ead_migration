@@ -126,6 +126,10 @@ class GetXmlFile extends ProcessPluginBase implements ContainerFactoryPluginInte
                 $destination_uri,
                 FileExists::Replace
               );
+      $file->setChangedTime(\Drupal::time()->getCurrentTime()); 
+      $file->save();  // ← persisted to DB
+      $curr_timestamp = $file->getChangedTime();
+
        return [
         'fid'  => (int) $file->id(),
         'f_uri' => $file_uri,
