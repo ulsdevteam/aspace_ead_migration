@@ -254,7 +254,11 @@ class ASpaceFileSource extends SourcePluginBase {
               ['@url' => $xml_path, '@id' => $repo_id, '@msg' => $e->getMessage()],
               );
             }
+         } else {
+				  \Drupal::logger('aspace_ead_migration')->warning('Skip processing findingaid: @itemid. Check publish status.', ['@itemid' => $item['id'] ]); 
          }
+      } else {
+        \Drupal::logger('aspace_ead_migration')->warning('Skip processing unpublished resource: @title', ['@title' => $item['title'] ]);
       }
      } //end resource interation
 
