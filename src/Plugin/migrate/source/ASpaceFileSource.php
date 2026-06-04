@@ -5,6 +5,7 @@ namespace Drupal\aspace_ead_migration\Plugin\migrate\source;
 use Drupal\aspace_ead_migration\ArchivesSpaceSession;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\File\FileSystemInterface;
+use GuzzleHttp\Exception\RequestException;
 use Drupal\migrate\MigrateException;
 use Drupal\migrate\Plugin\migrate\source\SourcePluginBase;
 use Drupal\migrate\Plugin\MigrationInterface;
@@ -22,6 +23,7 @@ class ASpaceFileSource extends SourcePluginBase {
   protected EntityTypeManagerInterface $entityTypeManager;
   protected ArchivesSpaceSession $session;
   protected FileSystemInterface $fileSystem;
+  protected $request_retry;
 
   protected string $apiBaseUrl;
   protected array $repoIds;
@@ -55,6 +57,11 @@ class ASpaceFileSource extends SourcePluginBase {
         );
     $this->fileSystem = \Drupal::service('file_system');
     $this->entityTypeManager = \Drupal::entityTypeManager();
+
+    $this->request_retry = [
+		'retries_num' => $configuration['max_retires'] ?? 3,
+		'delay' => $configuration['delay'] ?? 5  
+	];
   }
 
   /**
@@ -73,7 +80,9 @@ class ASpaceFileSource extends SourcePluginBase {
     }
 
     // Prepare ead directory                                                                                               
-    $this->fileSystem->prepareDirectory($eadXmlDir, FileSystemInterface::CREATE_DIRECTORY); 
+    if (!$this->fileSystem->prepareDirectory($eadXmlDir, FileSystemInterface::CREATE_DIRECTORY)) {
+      \Drupal::logger('aspace_ead_migration')->error('Failed to prepare destination directory: @dir', ['@dir' => $eadXmlDir],);
+    } 
   
     // Accumulate all rows from all repositories
     $rows = [];
@@ -154,7 +163,7 @@ class ASpaceFileSource extends SourcePluginBase {
     //Load the fieldConfig Object
     $field_instance = FieldConfig::load('media.findingaid.field_media_file');
     if ($field_instance) {
-       //Get the URI scheme (e.g., 'public', 'private').
+       //Get the URI scheme (e.g., 'public', 'private', s3).
       $file_storage = \Drupal::service('config.factory')->get('field.storage.media.field_media_file');
       $uploadDestination = $file_storage->get('settings.uri_scheme') ?? 'private';
        
@@ -206,12 +215,29 @@ class ASpaceFileSource extends SourcePluginBase {
         }
       
       // Fetch resources in order from the repository via searchAPI
-      $response = $this->session->request('GET', '/repositories/'. $repo_id . '/search', $parameters);
+      for ($try =0; $try <= $this->request_retry['retries_num']; $try++) {
+        	try {
+              $response = $this->session->request('GET', '/repositories/'. $repo_id . '/search', $parameters);
+              break;
+          }
+          catch(RequestException $e) {
+            \Drupal::logger('aspace_ead_migration')->warning('Connection ASpace API error on attempt @attempt/@max: @message',
+             ['@attempt' => $try,
+              '@max'     => $this->request_retry['retries_num'],
+              '@err'=>$e->getMessage()]);
+          }
+          if ($try < $this->request_retry['retries_num']) {
+              \Drupal::logger('aspace_ead_migration')->info(
+                'Retrying ID @id in @delay seconds...',
+              ['@id' => $repo_id, '@delay' => $this->request_retry['delay']]);
+              sleep($this->request_retry['delay']);
+          }
+      } 
       if (empty($response)) {
-        \Drupal::logger('aspace_ead_migration')->warning('No EAD returned for repository @id.',
-          ['@id' => $repo_id],
-        );
-        continue;
+          \Drupal::logger('aspace_ead_migration')->warning('No EAD returned for repository @id at @page.',
+            ['@id' => $repo_id, '@page' => $current_page]);
+	  $current_page++;
+          continue;
       }
 
       $pagination =[
