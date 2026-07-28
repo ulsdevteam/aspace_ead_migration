@@ -1,6 +1,5 @@
 langcode: en
 status: true
-dependencies: {  }
 id: aspace_ead_migration_media
 migration_group: aspace_ead_migration
 label: 'Migration ArchivesSpace EAD to Media entities'
@@ -10,6 +9,8 @@ source:
   constants:
     TITLE_SUFFIX: ' (EAD)'
     bundle_type: findingaid
+  findingaid_status:
+    - completed
   high_water_property:
     name: system_modified
     alias: sm

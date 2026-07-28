@@ -28,6 +28,7 @@ class ASpaceFileSource extends SourcePluginBase {
   protected string $apiBaseUrl;
   protected array $repoIds;
   protected string $eadXmlDir;
+  protected $configuredStatus;
 
   protected $pageSize = 250;
 
@@ -44,6 +45,15 @@ class ASpaceFileSource extends SourcePluginBase {
     } else {
       $this->eadXmlDir = self::SAVE_BASE_URI;
     }
+
+    //retrieve findingaid status value(s) from yml
+    $conf_status = $this->configuration['findingaid_status'] ?? NULL;
+    // Normalize: allow either a single or mulitple status values defined
+    if ($conf_status !== NULL && !is_array($conf_status)) {
+      $conf_status = [$conf_status];
+      }
+    $this->configuredStatus = $conf_status;
+
     $configs = \Drupal::service('config.factory')->get('aspace_ead_migration.settings');
     if (! empty($configs->get('archivesspace_base_uri') )) {
       $this->apiBaseUrl = rtrim($configs->get('archivesspace_base_uri'), '/');
@@ -254,7 +264,9 @@ class ASpaceFileSource extends SourcePluginBase {
         if ($item['publish']) {
          //parse json in response
          $data = json_decode($item['json'], true);
-         if (isset($data['is_finding_aid_status_published']) && $data['is_finding_aid_status_published'])
+         if ((isset($data['is_finding_aid_status_published']) && $data['is_finding_aid_status_published'])
+             && ($this->configuredStatus === NULL 
+                || (isset($data['finding_aid_status']) && in_array($data['finding_aid_status'], $this->configuredStatus, TRUE))))
          {
           // Retrieve URI for later Media title usage
           $item_ead['file_uri'] = $item['uri'];
