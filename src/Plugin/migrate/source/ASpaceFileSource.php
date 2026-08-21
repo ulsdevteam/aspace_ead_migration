@@ -21,7 +21,8 @@ use Drupal\field\Entity\FieldConfig;
  */
 class ASpaceFileSource extends SourcePluginBase {
   protected EntityTypeManagerInterface $entityTypeManager;
-  protected ArchivesSpaceSession $session;
+  protected ?ArchivesSpaceSession $session = null;
+  protected ?string $sessionError = null;
   protected FileSystemInterface $fileSystem;
   protected $request_retry;
 
@@ -62,10 +63,20 @@ class ASpaceFileSource extends SourcePluginBase {
     $username = $configs->get('archivesspace_username');
     $password = $configs->get('archivesspace_password');
     $this->repoIds = array_map('intval', $configs->get('archivesspace_repository_ids') ?? []);
-    $this->session = ArchivesSpaceSession::withConnectionInfo(
-          $this->apiBaseUrl, $username, $password
-        );
-    $this->fileSystem = \Drupal::service('file_system');
+    try {
+      $this->session = ArchivesSpaceSession::withConnectionInfo(
+        $this->apiBaseUrl, $username, $password
+      );
+    }
+    catch (\Throwable $e) {
+      $this->session = null;
+      $this->sessionError = $e->getMessage();
+      \Drupal::logger('aspace_ead_migration')->error(
+        'Could not initialize ArchivesSpace session: @msg',
+        ['@msg' => $e->getMessage()],
+      );
+    }
+	$this->fileSystem = \Drupal::service('file_system');
     $this->entityTypeManager = \Drupal::entityTypeManager();
 
     $this->request_retry = [
@@ -82,7 +93,10 @@ class ASpaceFileSource extends SourcePluginBase {
     $repoIds = $this->repoIds;
     $eadXmlDir = $this->eadXmlDir;
 
-    if (empty($apiBaseUrl)) {
+    if ($this->sessionError !== null) {
+      throw new MigrateException('ASpace EAD Migration: could not connect to ArchivesSpace: ' . $this->sessionError);
+    }
+	if (empty($apiBaseUrl)) {
       throw new MigrateException('ASpace EAD Migration: API base url is not configured.');
     }
     if (empty($repoIds)) {
@@ -192,6 +206,10 @@ class ASpaceFileSource extends SourcePluginBase {
    * @return int   Total number of files reported by the API.
    */
    protected function fetchEAD(int $repo_id, int $last_import): array {
+    if (!$this->session) {
+      \Drupal::logger('aspace_ead_migration')->error('ASpace session unavailable; skipping repository @id.', ['@id' => $repo_id]);
+      return [];
+    }
     $count_per_repo = 0;
     $current_page = 1;
     $all_eads = [];
@@ -330,7 +348,7 @@ class ASpaceFileSource extends SourcePluginBase {
    *  @return int Total source row count
    */
   public function count($refresh = FALSE): int {
-    if (empty($this->apiBaseUrl) || empty($this->repoIds)) {
+    if ($this->sessionError !== null || empty($this->apiBaseUrl) || empty($this->repoIds)) {
       return 0;
     }
     $total = 0;
@@ -347,6 +365,9 @@ class ASpaceFileSource extends SourcePluginBase {
    * @return int   Total number of files reported by the API.
    */
   protected function fetchRepositoryTotal(int $repo_id): int {
+    if (!$this->session) {
+      return 0;
+    }
     $parameters = [
         'page' => 1,
         'page_size' => $this->pageSize,
