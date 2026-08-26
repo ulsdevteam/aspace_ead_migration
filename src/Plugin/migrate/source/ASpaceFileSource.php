@@ -93,7 +93,10 @@ class ASpaceFileSource extends SourcePluginBase {
     if (!$this->fileSystem->prepareDirectory($eadXmlDir, FileSystemInterface::CREATE_DIRECTORY)) {
       \Drupal::logger('aspace_ead_migration')->error('Failed to prepare destination directory: @dir', ['@dir' => $eadXmlDir],);
     } 
-  
+    
+    // reset HW value if the configured repositoryIds get changed since last run
+    $this->resetHighWaterIfRepoIdsChanged($repoIds);
+
     // Accumulate all rows from all repositories
     $rows = [];
     foreach ($repoIds as $repo_id) {
@@ -223,7 +226,7 @@ class ASpaceFileSource extends SourcePluginBase {
       if ($assoc_aq) {
         $parameters ["aq"]= json_encode($assoc_aq);
         }
-      
+      // \Drupal::logger('aspace_ead_migration')->info('source data query params: @params', ['@params' => print_r($parameters,TRUE)]);
       // Fetch resources in order from the repository via searchAPI
       for ($try =0; $try <= $this->request_retry['retries_num']; $try++) {
         	try {
@@ -364,5 +367,41 @@ class ASpaceFileSource extends SourcePluginBase {
       return 0;
     }
   }
+
+  /**
+ * Resets the stored high-water value if the configured repository ID list
+ * has changed since the last migration run.
+ * @param array $repoIds
+ *   The repository IDs currently configured on the migration.
+ */
+protected function resetHighWaterIfRepoIdsChanged(array $repoIds): void {
+  $state = \Drupal::state();
+  $migration_id = $this->migration->id();
+
+  $state_key = 'aspace_ead_migration.repo_ids.' . $migration_id;
+  $stored_repo_ids = $state->get($state_key, []);
+
+  // Normalize both lists 
+  $normalized_current = $this->normalizeRepoIds($repoIds);
+  $normalized_stored = $this->normalizeRepoIds($stored_repo_ids);
+ 
+  if ($normalized_current !== $normalized_stored) {
+    // clear HW if Repository list changed 
+    \Drupal::logger('aspace_ead_migration')->notice('Repo list changed. Resetting highwater.');
+    \Drupal::keyValue('migrate:high_water')->delete($migration_id);
+
+    $state->set($state_key, $normalized_current);
+  }
+}
+
+/**
+ * Normalizes a repository ID list for reliable comparison.
+ * @param array $repoIds
+ */
+protected function normalizeRepoIds(array $repoIds): array {
+  $normalized = array_map('strval', $repoIds);
+  sort($normalized);
+  return array_values($normalized);
+}
 
 }
