@@ -3,6 +3,7 @@
 namespace Drupal\aspace_ead_migration;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
 
 /**
  * An ArchivesSpace authenticated session object.
@@ -120,8 +121,8 @@ class ArchivesSpaceSession {
     }
     catch (RequestException $e)  {
       \Drupal::logger('aspace_ead_migration')->warning(
-        'Failed to process HTTP request @type from @path',
-        ['@type' => $type, '@msg' => $e->getMessage()]);
+        'Failed to process HTTP request @type to @path: @msg',
+        ['@type' => $type, '@path'=> $path, '@msg' => $e->getMessage()]);
     }
   }
 
@@ -143,8 +144,14 @@ class ArchivesSpaceSession {
     }        
     if ( !empty($passWord )) {                                                                                                             
       $state_config['password'] = $passWord;                                                                                          
-    }         
+    }    
+    
     $this->connectionInfo = array_replace($this->connectionInfo, $state_config);
+    //capture login data missing error
+    if (empty($this->connectionInfo['base_uri']) || empty($this->connectionInfo['username']) || empty($this->connectionInfo['password'])) {
+      throw new \RuntimeException('Cannot log in to ArchivesSpace: base URI, username, or password is not configured.');
+    }
+    
 
     // Setup the client.
     $client = new Client([
@@ -157,7 +164,15 @@ class ArchivesSpaceSession {
                  '/login?password=' .
                  rawurlencode($this->connectionInfo['password']);
 
-    $response = $client->post($login_url);
+    try {
+      $response = $client->post($login_url);
+    }
+   catch (RequestException $e) {
+      \Drupal::logger('aspace_ead_migration')->warning(
+        'Failed to log in to ArchivesSpace: @msg',
+        ['@msg' => $e->getMessage()]
+      );
+   }
 
     // Return the Session ID from the response.
     $login_response = json_decode($response->getBody(), TRUE);
