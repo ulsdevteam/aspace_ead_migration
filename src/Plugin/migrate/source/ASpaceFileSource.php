@@ -64,7 +64,7 @@ class ASpaceFileSource extends SourcePluginBase {
     $password = $configs->get('archivesspace_password');
     $this->repoIds = array_map('intval', $configs->get('archivesspace_repository_ids') ?? []);
     try {
-      $this->session = ArchivesSpaceSession::withConnectionInfo(
+    	$this->session = ArchivesSpaceSession::withConnectionInfo(
         $this->apiBaseUrl, $username, $password
       );
     }
@@ -76,7 +76,7 @@ class ASpaceFileSource extends SourcePluginBase {
         ['@msg' => $e->getMessage()],
       );
     }
-	$this->fileSystem = \Drupal::service('file_system');
+    $this->fileSystem = \Drupal::service('file_system');
     $this->entityTypeManager = \Drupal::entityTypeManager();
 
     $this->request_retry = [
@@ -107,7 +107,6 @@ class ASpaceFileSource extends SourcePluginBase {
     if (!$this->fileSystem->prepareDirectory($eadXmlDir, FileSystemInterface::CREATE_DIRECTORY)) {
       \Drupal::logger('aspace_ead_migration')->error('Failed to prepare destination directory: @dir', ['@dir' => $eadXmlDir],);
     } 
-  
     // Accumulate all rows from all repositories
     $rows = [];
     foreach ($repoIds as $repo_id) {
@@ -206,7 +205,7 @@ class ASpaceFileSource extends SourcePluginBase {
    * @return int   Total number of files reported by the API.
    */
    protected function fetchEAD(int $repo_id, int $last_import): array {
-    if (!$this->session) {
+     if (!$this->session) {
       \Drupal::logger('aspace_ead_migration')->error('ASpace session unavailable; skipping repository @id.', ['@id' => $repo_id]);
       return [];
     }
@@ -241,8 +240,8 @@ class ASpaceFileSource extends SourcePluginBase {
       if ($assoc_aq) {
         $parameters ["aq"]= json_encode($assoc_aq);
         }
-      
       // Fetch resources in order from the repository via searchAPI
+      $response = null;
       for ($try =0; $try <= $this->request_retry['retries_num']; $try++) {
         	try {
               $response = $this->session->request('GET', '/repositories/'. $repo_id . '/search', $parameters);
@@ -264,7 +263,7 @@ class ASpaceFileSource extends SourcePluginBase {
       if (empty($response)) {
           \Drupal::logger('aspace_ead_migration')->warning('No EAD returned for repository @id at @page.',
             ['@id' => $repo_id, '@page' => $current_page]);
-	  $current_page++;
+	        $current_page++;
           continue;
       }
 
@@ -348,7 +347,7 @@ class ASpaceFileSource extends SourcePluginBase {
    *  @return int Total source row count
    */
   public function count($refresh = FALSE): int {
-    if ($this->sessionError !== null || empty($this->apiBaseUrl) || empty($this->repoIds)) {
+      if ($this->sessionError !== null || empty($this->apiBaseUrl) || empty($this->repoIds)) {
       return 0;
     }
     $total = 0;
@@ -385,5 +384,4 @@ class ASpaceFileSource extends SourcePluginBase {
       return 0;
     }
   }
-
 }
