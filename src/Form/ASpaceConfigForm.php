@@ -89,6 +89,12 @@ class ASpaceConfigForm extends ConfigFormBase {
       ->set('archivesspace_repository_ids', array_values($int_ids))
       ->save();
 
+    // Only overwrite the stored password if the user submitted a new one.
+    $password = $form_state->getValue('archivesspace_password');
+    if ($password === NULL || $password === '') {
+      $form_state->setValue('archivesspace_password', $config->get('archivesspace_password'));
+    }
+
     parent::submitForm($form, $form_state);
   }
 
