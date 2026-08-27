@@ -310,10 +310,10 @@ class ASpaceFileSource extends SourcePluginBase {
               );
             }
          } else {
-				  \Drupal::logger('aspace_ead_migration')->warning('Skip processing findingaid: @itemid. Check publish status.', ['@itemid' => $item['id'] ]); 
+		\Drupal::logger('aspace_ead_migration')->info('Skip processing findingaid: @itemid. Check publish status.', ['@itemid' => $item['id'] ]); 
          }
       } else {
-        \Drupal::logger('aspace_ead_migration')->warning('Skip processing unpublished resource: @title', ['@title' => $item['title'] ]);
+        \Drupal::logger('aspace_ead_migration')->info('Skip processing unpublished resource: @title', ['@title' => $item['title'] ]);
       }
      } //end resource interation
 
