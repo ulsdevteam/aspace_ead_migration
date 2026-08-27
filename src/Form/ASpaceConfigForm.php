@@ -54,7 +54,6 @@ class ASpaceConfigForm extends ConfigFormBase {
     $form['connection']['archivesspace_password'] = [
       '#type' => 'password',
       '#title' => $this->t('Password'),
-      '#config_target' => 'aspace_ead_migration.settings:archivesspace_password',
       '#description'   => $this->t('Leave blank if not updating the password.'),
       '#attributes'    => $config->get('archivesspace_password')
                           ? ['placeholder' => $this->t('(password has already stored)')]
@@ -84,17 +83,18 @@ class ASpaceConfigForm extends ConfigFormBase {
     //retrieve integer repository IDs
     $repo_ids = $this->parseRepoIds($form_state->getValue('archivesspace_repository_ids'));
     $int_ids = array_map('intval', $repo_ids);
-
     $this->config('aspace_ead_migration.settings')
-      ->set('archivesspace_repository_ids', array_values($int_ids))
-      ->save();
+        ->set('archivesspace_repository_ids', array_values($int_ids))
+        ->save();
 
-    // Only overwrite the stored password if the user submitted a new one.
-    $password = $form_state->getValue('archivesspace_password');
-    if ($password === NULL || $password === '') {
-      $form_state->setValue('archivesspace_password', $config->get('archivesspace_password'));
+    // Only overwrite the stored password if the user submitted a nonblank value
+    $prev_pw = $this->config('aspace_ead_migration.settings')->get('archivesspace_password');
+    $submitted_pw = trim($form_state->getValue('archivesspace_password'));
+    if ( !empty($submitted_pw) && $submitted_pw !== $prev_pw ) {
+        $this->config('aspace_ead_migration.settings')
+        ->set('archivesspace_password',$submitted_pw)
+        ->save();
     }
-
     parent::submitForm($form, $form_state);
   }
 
