@@ -172,6 +172,7 @@ class ArchivesSpaceSession {
         'Failed to log in to ArchivesSpace: @msg',
         ['@msg' => $e->getMessage()]
       );
+      throw new \RuntimeException('ArchivesSpace login failed');
    }
 
     // Return the Session ID from the response.

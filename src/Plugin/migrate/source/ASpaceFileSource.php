@@ -93,7 +93,6 @@ class ASpaceFileSource extends SourcePluginBase {
     if (!$this->fileSystem->prepareDirectory($eadXmlDir, FileSystemInterface::CREATE_DIRECTORY)) {
       \Drupal::logger('aspace_ead_migration')->error('Failed to prepare destination directory: @dir', ['@dir' => $eadXmlDir],);
     } 
-    
     // Accumulate all rows from all repositories
     $rows = [];
     foreach ($repoIds as $repo_id) {
@@ -223,8 +222,6 @@ class ASpaceFileSource extends SourcePluginBase {
       if ($assoc_aq) {
         $parameters ["aq"]= json_encode($assoc_aq);
         }
-      //check query parameters
-      //\Drupal::logger('aspace_ead_migration')->info('source data query params: @params', ['@params' => print_r($parameters,TRUE)]);
       
       // Fetch resources in order from the repository via searchAPI
       $response = null;
