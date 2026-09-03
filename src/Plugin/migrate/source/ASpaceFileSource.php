@@ -27,7 +27,7 @@ class ASpaceFileSource extends SourcePluginBase {
   protected $request_retry;
 
   protected string $apiBaseUrl;
-  protected array $repoIds;
+  protected int $repoId;
   protected string $eadXmlDir;
   protected $configuredStatus;
 
@@ -62,7 +62,7 @@ class ASpaceFileSource extends SourcePluginBase {
     
     $username = $configs->get('archivesspace_username');
     $password = $configs->get('archivesspace_password');
-    $this->repoIds = array_map('intval', $configs->get('archivesspace_repository_ids') ?? []);
+    $this->repoId = (int) ($configuration['repo_id'] ?? 0);
     try {
     	$this->session = ArchivesSpaceSession::withConnectionInfo(
         $this->apiBaseUrl, $username, $password
@@ -80,8 +80,8 @@ class ASpaceFileSource extends SourcePluginBase {
     $this->entityTypeManager = \Drupal::entityTypeManager();
 
     $this->request_retry = [
-		'retries_num' => $configuration['max_retires'] ?? 3,
-		'delay' => $configuration['delay'] ?? 5  
+		'retries_num' => $this->configuration['max_retires'] ?? 3,
+		'delay' => $this->configuration['delay'] ?? 5  
 	];
   }
 
@@ -90,35 +90,30 @@ class ASpaceFileSource extends SourcePluginBase {
    */
   public function initializeIterator(): \ArrayIterator {
     $apiBaseUrl = $this->apiBaseUrl;
-    $repoIds = $this->repoIds;
+    $repo_id = $this->repoId;
     $eadXmlDir = $this->eadXmlDir;
-
     if ($this->sessionError !== null) {
       throw new MigrateException('ASpace EAD Migration: could not connect to ArchivesSpace: ' . $this->sessionError);
     }
-	if (empty($apiBaseUrl)) {
+    if (empty($apiBaseUrl)) {
       throw new MigrateException('ASpace EAD Migration: API base url is not configured.');
     }
-    if (empty($repoIds)) {
-      throw new MigrateException('ASpace EAD Migration: No ASpace repositories are configured.');
-    }
-
+    
     // Prepare ead directory                                                                                               
     if (!$this->fileSystem->prepareDirectory($eadXmlDir, FileSystemInterface::CREATE_DIRECTORY)) {
       \Drupal::logger('aspace_ead_migration')->error('Failed to prepare destination directory: @dir', ['@dir' => $eadXmlDir],);
     } 
+  
     // Accumulate all rows from all repositories
     $rows = [];
-    foreach ($repoIds as $repo_id) {
-      try {
-        // Fetch all paginated resource per repository filter by last importing
-        $last_import = $this->getHighWater() ?? 0;
-        $xml_results = $this->fetchEAD($repo_id, $last_import);
-        if (empty($xml_results)) {
+    try {
+      // Fetch all paginated resource per repository filter by last importing
+      $last_import = $this->getHighWater() ?? 0;
+      $xml_results = $this->fetchEAD($repo_id, $last_import);
+      if (empty($xml_results)) {
           \Drupal::logger('aspace_ead_migration')->info('No EAD returned for repository @id.', ['@id' => $repo_id],); 
-          continue;
-        }
-
+      } 
+      else {
         foreach ($xml_results as $item) {
           $filename = basename($item['xml_path']); //.xml
           $rows[] = [
@@ -132,15 +127,15 @@ class ASpaceFileSource extends SourcePluginBase {
           ];
         }
       }
-      catch (\Throwable $e) {
+    }
+    catch (\Throwable $e) {
         \Drupal::logger('aspace_ead_migration')->error(
-          'Skipping repository @id — could not fetch resource: @msg',
+          'Repository @id — could not fetch resource: @msg',
           ['@id' => $repo_id, '@msg' => $e->getMessage()],
         );
-      }
     }
     \Drupal::logger('aspace_ead_migration')->info(
-      'ASpace Source built @count migration rows.',['@count' => count($rows)],);
+      'ASpace Source (repository @id) built @count migration rows.',['@id' => $repo_id, '@count' => count($rows)],);
     
     $modified = array_column($rows, 'system_modified');
     //Sort all $rows with high water field before process
@@ -205,7 +200,7 @@ class ASpaceFileSource extends SourcePluginBase {
    * @return int   Total number of files reported by the API.
    */
    protected function fetchEAD(int $repo_id, int $last_import): array {
-     if (!$this->session) {
+    if (!$this->session) {
       \Drupal::logger('aspace_ead_migration')->error('ASpace session unavailable; skipping repository @id.', ['@id' => $repo_id]);
       return [];
     }
@@ -215,7 +210,7 @@ class ASpaceFileSource extends SourcePluginBase {
     $assoc_aq = [];
     //convert $last_import timestamp to UTC for advance query
     if ($last_import !==0 ) {
-      $last_import_date = date('Y-m-d', $last_import);
+      $last_import_date = date('Y-m-d', strtotime('-1 day', $last_import));
       $assoc_aq = [
         "jsonmodel_type" => "advanced_query",
         "query" => [
@@ -240,6 +235,7 @@ class ASpaceFileSource extends SourcePluginBase {
       if ($assoc_aq) {
         $parameters ["aq"]= json_encode($assoc_aq);
         }
+      
       // Fetch resources in order from the repository via searchAPI
       $response = null;
       for ($try =0; $try <= $this->request_retry['retries_num']; $try++) {
@@ -263,7 +259,7 @@ class ASpaceFileSource extends SourcePluginBase {
       if (empty($response)) {
           \Drupal::logger('aspace_ead_migration')->warning('No EAD returned for repository @id at @page.',
             ['@id' => $repo_id, '@page' => $current_page]);
-	        $current_page++;
+	  $current_page++;
           continue;
       }
 
@@ -310,7 +306,7 @@ class ASpaceFileSource extends SourcePluginBase {
               );
             }
          } else {
-		\Drupal::logger('aspace_ead_migration')->info('Skip processing findingaid: @itemid. Check publish status.', ['@itemid' => $item['id'] ]); 
+	\Drupal::logger('aspace_ead_migration')->info('Skip processing findingaid: @itemid. Check publish status.', ['@itemid' => $item['id'] ]); 
          }
       } else {
         \Drupal::logger('aspace_ead_migration')->info('Skip processing unpublished resource: @title', ['@title' => $item['title'] ]);
@@ -347,15 +343,10 @@ class ASpaceFileSource extends SourcePluginBase {
    *  @return int Total source row count
    */
   public function count($refresh = FALSE): int {
-      if ($this->sessionError !== null || empty($this->apiBaseUrl) || empty($this->repoIds)) {
+    if ($this->sessionError !== null || empty($this->apiBaseUrl) || empty($this->repoId)) {
       return 0;
     }
-    $total = 0;
-
-    foreach ($this->repoIds as $repo_id) {
-      $total += $this->fetchRepositoryTotal($repo_id);
-    }
-    return $total;
+    return $this->fetchRepositoryTotal($this->repoId);
   }
  
   /**
