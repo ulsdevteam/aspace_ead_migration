@@ -80,11 +80,14 @@ class ASpaceConfigForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state): void {
+    // Capture the OLD repository array
+    $old_repo_ids = $this->config('aspace_ead_migration.settings')->get('archivesspace_repository_ids') ?? [];
+
     //retrieve integer repository IDs
     $repo_ids = $this->parseRepoIds($form_state->getValue('archivesspace_repository_ids'));
-    $int_ids = array_map('intval', $repo_ids);
+    $curr_repo_ids = array_values(array_map('intval', $repo_ids));
     $this->config('aspace_ead_migration.settings')
-        ->set('archivesspace_repository_ids', array_values($int_ids))
+        ->set('archivesspace_repository_ids', $curr_repo_ids)
         ->save();
 
     // Only overwrite the stored password if the user submitted a nonblank value
@@ -95,7 +98,17 @@ class ASpaceConfigForm extends ConfigFormBase {
         ->set('archivesspace_password',$submitted_pw)
         ->save();
     }
-    parent::submitForm($form, $form_state);
+    
+   //clear migration plugin definitions to force the deriver to regenerate migration definitions immediately.
+   $old_sorted = array_map('intval', $old_repo_ids);
+   $new_sorted = $curr_repo_ids;
+   sort($old_sorted);
+   sort($new_sorted);
+   if ($old_sorted !== $new_sorted) {
+     \Drupal::service('plugin.manager.migration')->clearCachedDefinitions();
+    }
+
+  parent::submitForm($form, $form_state);
   }
 
   /**
