@@ -23,7 +23,6 @@ function aspace_ead_migration_post_update_split_map_table_by_repo(array &$sandbo
   // parsed from paths like "/repositories/10/resources/290".
   $sourceid1_values = $database->select($old_table, 'm')
     ->fields('m', ['sourceid1'])
-    ->distinct()
     ->execute()
     ->fetchCol();
 
