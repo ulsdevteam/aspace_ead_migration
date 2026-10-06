@@ -2,52 +2,74 @@
 # The script is to run two ead migration groups in sequence via cron every other day at midnight.
 #   1. aspace_ead_migration //migrate all derivative repositories configurated on ui
 #   2. ead_migration  //migrate media with finingaid file to node
+# Usage:
+#   run_aspace_ead_migration.sh [--project-root=/opt/bd-islandora]
+# If no project root is given, the default below is used.
 
 set -uo pipefail
-
 PROJECT_ROOT="/opt/bd-islandora"
 SERVICE_NAME="drupal" 
 
-[ -d "$PROJECT_ROOT" ] && cd "$PROJECT_ROOT" || { echo "Failed to cd project root directory $PROJECT_ROOT"; exit 1; }
-
-# Get the migration IDs for drush mrs usage
-get_migration_ids() {
-  local group_name="$1"
-  docker compose exec -T "$SERVICE_NAME" with-contenv bash -lc "drush migrate:status --group=${group_name} --field=id"
+usage() {
+  echo "Usage: $0 [--project-root=/opt/bd-islandora]"
 }
 
-# Reset the migration if a previous run died mid-import leaves 'importing' status 
+# pass project root path as command line arg
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --project-root=*) PROJECT_ROOT="${1#*=}"; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown argument: $1"; usage; exit 1 ;;
+  esac
+done
+
+
+[ -d "$PROJECT_ROOT" ] && cd "$PROJECT_ROOT" || { echo "Failed to cd project root directory $PROJECT_ROOT"; exit 1; }
+
+# Get the migration ID and status for drush mrs usage
+get_migration_statuses() {
+  local group_name="$1"
+  docker-compose exec -T "$SERVICE_NAME" with-contenv bash -lc "drush migrate:status --group=${group_name} --fields=id,status --format=tsv"
+}
+
+# Reset the migration if a previous run died mid-import leaves status(Importing, Rolling back or Stopping). 
+# Migrations that are Idle or Disabled are left alone.
 reset_migration() {
   local group_name="$1"
-  local ids_output
-  local migration_ids=()
-  local migration_id
+  local status_output migration_id migration_status
+  local found=0
 
-  echo "--Resetting migration status for group: ${group_name}"
+  echo "--Checking migration status for group: ${group_name}"
 
-  if ! ids_output=$(get_migration_ids "$group_name"); then
-    echo "--Failed to list migration IDs for group: ${group_name}"
+  if ! status_output=$(get_migration_statuses "$group_name"); then
+    echo "--Failed to get migration statuses for group: ${group_name}"
     return 1
   fi
 
-  # get IDs removing leading/trailing spaces and tab
-  while IFS= read -r migration_id; do
+  while IFS=$'\t' read -r migration_id migration_status; do
     migration_id="${migration_id//$'\r'/}"
-    [ -n "$migration_id" ] && migration_ids+=("$migration_id")
-  done <<< "$ids_output"
+    migration_status="${migration_status//$'\r'/}"
+    [ -n "$migration_id" ] || continue
+    found=1
 
-  if [ "${#migration_ids[@]}" -eq 0 ]; then
+    case "${migration_status,,}" in
+      importing|"rolling back"|stopping)
+        echo "--Migration ${migration_id} is stuck (status: ${migration_status}), resetting to idle"
+        if ! docker-compose exec -T "$SERVICE_NAME" with-contenv bash -lc "drush mrs ${migration_id}"; then
+          echo "--Failed to reset migration: ${migration_id}"
+          return 1
+        fi
+        ;;
+      *)
+        echo "--Migration ${migration_id} status is '${migration_status}', no reset needed"
+        ;;
+    esac
+  done <<< "$status_output"
+
+  if [ "$found" -eq 0 ]; then
     echo "--No migrations found for group: ${group_name}"
     return 1
   fi
-
-  for migration_id in "${migration_ids[@]}"; do
-    echo "--Resetting migration: ${migration_id}"
-    if ! docker compose exec -T "$SERVICE_NAME" with-contenv bash -lc "drush mrs ${migration_id}"; then
-      echo "--Failed to reset migration: ${migration_id}"
-      return 1
-    fi
-  done
 
   return 0
 }
@@ -62,7 +84,7 @@ run_migration_group() {
     echo "=== ${group_name} reset failed at $(date), exiting without running import ==="
     exit 1
   fi
-  docker compose exec -T "$SERVICE_NAME" with-contenv bash -lc "drush mim --group=${group_name} --continue-on-failure"  
+  docker-compose exec -T "$SERVICE_NAME" with-contenv bash -lc "drush mim --group=${group_name} --continue-on-failure"  
   local exit_code=$?
 
   echo "=== ${group_name} run finished at $(date) with exit code ${exit_code} ===" 
